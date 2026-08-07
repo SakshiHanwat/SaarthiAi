@@ -1,0 +1,54 @@
+{
+  "tracks": [
+    {
+      "id": "frontend",
+      "title": "Frontend Engineering",
+      "topics": [
+        "JavaScript fundamentals",
+        "React & component architecture",
+        "CSS & responsive design",
+        "Browser APIs & performance",
+        "TypeScript",
+        "Testing"
+      ]
+    },
+    {
+      "id": "backend",
+      "title": "Backend Engineering",
+      "topics": [
+        "Node.js & Express",
+        "REST API design",
+        "Databases (SQL & NoSQL)",
+        "Authentication & security",
+        "Caching & queues",
+        "System design basics"
+      ]
+    },
+    {
+      "id": "fullstack",
+      "title": "Full Stack Engineering",
+      "topics": [
+        "React with Next.js",
+        "API routes",
+        "State management",
+        "Database integration",
+        "Deployment & DevOps basics",
+        "Performance optimization"
+      ]
+    },
+    {
+      "id": "dsa",
+      "title": "Data Structures & Algorithms",
+      "topics": [
+        "Arrays & strings",
+        "Linked lists",
+        "Trees & graphs",
+        "Dynamic programming",
+        "Sorting & searching",
+        "Complexity analysis"
+      ]
+    }
+  ],
+  "difficulty_levels": ["junior", "mid", "senior"],
+  "question_types": ["conceptual", "coding", "system_design", "behavioral"]
+}
