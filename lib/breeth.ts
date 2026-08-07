@@ -6,12 +6,7 @@
 const BREETH_BASE_URL = process.env.BREETH_BASE_URL || 'https://api.thebreeth.com/v1';
 const BREETH_API_KEY = process.env.BREETH_API_KEY || '';
 
-interface BreethHeaders {
-  'Content-Type': string;
-  Authorization: string;
-}
-
-function getHeaders(): BreethHeaders {
+function getHeaders(): Record<string, string> {
   return {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${BREETH_API_KEY}`,
