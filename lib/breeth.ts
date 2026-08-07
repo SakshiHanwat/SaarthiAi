@@ -183,13 +183,13 @@ export async function getSessionHistory(sessionId: string): Promise<InterviewMes
       if (!text) return null;
 
       if (text.startsWith('Interviewer:')) {
-        return { role: 'interviewer', content: text.replace(/^Interviewer:\s*/, '') };
+        return { role: 'interviewer', text: text.replace(/^Interviewer:\s*/, '') };
       }
       if (text.startsWith('Candidate:')) {
-        return { role: 'user', content: text.replace(/^Candidate:\s*/, '') };
+        return { role: 'candidate', text: text.replace(/^Candidate:\s*/, '') };
       }
       // Fallback — unknown facts treated as interviewer context
-      return { role: 'interviewer', content: text };
+      return { role: 'interviewer', text };
     })
     .filter((m): m is InterviewMessage => m !== null);
 }

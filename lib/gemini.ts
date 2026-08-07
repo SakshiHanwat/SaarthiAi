@@ -1,6 +1,12 @@
 /**
  * Gemini API wrapper for Saarthi
- * Handles interview question generation and answer evaluation
+ *
+ * Two primary functions for the interview flow:
+ *   nextTurn     — generate the next interviewer question / follow-up
+ *   finalFeedback — generate structured end-of-interview feedback
+ *
+ * Both return parsed objects (no markdown fences, no prose wrappers).
+ * Legacy exports kept for any other callers.
  */
 
 import {
@@ -9,136 +15,258 @@ import {
   HarmBlockThreshold,
 } from '@google/generative-ai';
 
+// ---------------------------------------------------------------------------
+// Setup
+// ---------------------------------------------------------------------------
+
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 const safetySettings = [
-  { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
+  { category: HarmCategory.HARM_CATEGORY_HARASSMENT,  threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
   { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
 ];
 
 function getModel() {
-  return genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
-    safetySettings,
-  });
+  return genAI.getGenerativeModel({ model: 'gemini-1.5-flash', safetySettings });
 }
 
+/** Extract the first JSON object from a model response (strips markdown fences). */
+function extractJSON<T>(text: string): T {
+  // Strip ```json ... ``` or ``` ... ``` fences
+  const stripped = text.replace(/^```(?:json)?\s*/m, '').replace(/\s*```\s*$/m, '').trim();
+  const match = stripped.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error(`Gemini returned no JSON object. Raw: ${text.slice(0, 300)}`);
+  return JSON.parse(match[0]) as T;
+}
+
+// ---------------------------------------------------------------------------
+// Shared types
+// ---------------------------------------------------------------------------
+
+/** A single conversation turn — role matches the API contract */
 export interface InterviewMessage {
-  role: 'user' | 'interviewer';
-  content: string;
+  role: 'interviewer' | 'candidate';
+  text: string;
 }
 
-export interface GenerateQuestionOptions {
-  track: string;
-  difficulty: 'junior' | 'mid' | 'senior';
-  questionType: 'conceptual' | 'coding' | 'system_design' | 'behavioral';
-  topics: string[];
-  history: InterviewMessage[];
-  candidateName?: string;
+/** Mission row from candidates.json */
+export interface Mission {
+  day: number;
+  title: string;
+  passed?: boolean;
+  skipped?: boolean;
+  attempts?: number;
 }
 
-export interface EvaluationResult {
-  score: number; // 0–10
-  feedback: string;
+/** Candidate object shape from candidates.json */
+export interface CandidateData {
+  member: {
+    id: string;
+    name: string;
+    jobRole: string;
+    yearsExperience: number;
+    education: string;
+    status: string;
+  };
+  missions: Mission[];
+  signals?: {
+    commitDays?: number;
+    missionsCompleted?: number;
+    missionsFirstTry?: number;
+  };
+}
+
+/** What nextTurn returns */
+export interface NextTurnResult {
+  /** The interviewer's next message (question or follow-up) */
+  reply: string;
+  /** Which curriculum day this turn covers (0 = no specific day / meta question) */
+  dayNumber: number;
+  /** One-sentence signal for Breeth writeInterviewSignal (null if answer not yet available) */
+  signal: string | null;
+}
+
+/** What finalFeedback returns */
+export interface FinalFeedbackResult {
+  summary: string;
   strengths: string[];
-  improvements: string[];
-  followUp?: string;
+  gaps: string[];
+  next: string[];
 }
 
-/**
- * Generates the next interview question or follow-up
- */
-export async function generateInterviewQuestion(
-  options: GenerateQuestionOptions
-): Promise<string> {
-  const { track, difficulty, questionType, topics, history, candidateName } = options;
+// ---------------------------------------------------------------------------
+// 1. nextTurn — generate the next interviewer question / follow-up
+// ---------------------------------------------------------------------------
+
+export interface NextTurnOptions {
+  candidate: CandidateData;
+  /** Full conversation so far (from the client) */
+  history: InterviewMessage[];
+  /** The candidate's latest answer (empty string on "start") */
+  latestAnswer: string;
+  /** Curriculum day titles this session has already covered */
+  daysCovered: number[];
+  /** Prior signals from Breeth (from previous sessions), may be empty */
+  priorSignals: string[];
+  /** Is this the very first turn of the session? */
+  isStart: boolean;
+}
+
+export async function nextTurn(opts: NextTurnOptions): Promise<NextTurnResult> {
+  const { candidate, history, latestAnswer, daysCovered, priorSignals, isStart } = opts;
   const model = getModel();
 
-  const historyContext = history
-    .slice(-6)
-    .map((m) => `${m.role === 'interviewer' ? 'Interviewer' : 'Candidate'}: ${m.content}`)
+  // Build mission intelligence
+  const passedEasy   = candidate.missions.filter(m => m.passed && (m.attempts ?? 1) <= 2);
+  const passedHard   = candidate.missions.filter(m => m.passed && (m.attempts ?? 1) >= 4);
+  const failed       = candidate.missions.filter(m => m.passed === false);
+  const skipped      = candidate.missions.filter(m => m.skipped === true);
+  const allDayNums   = candidate.missions.map(m => m.day);
+  const uncovered    = allDayNums.filter(d => !daysCovered.includes(d));
+
+  const missionSummary = [
+    passedEasy.length  ? `Strong topics (passed easily): ${passedEasy.map(m => m.title).join(', ')}.` : '',
+    passedHard.length  ? `Struggled but passed (high-attempt, probe deeper): ${passedHard.map(m => `${m.title} (${m.attempts} attempts)`).join(', ')}.` : '',
+    failed.length      ? `FAILED topics (prime interview targets): ${failed.map(m => m.title).join(', ')}.` : '',
+    skipped.length     ? `SKIPPED topics (probe if fundamental gaps): ${skipped.map(m => m.title).join(', ')}.` : '',
+    uncovered.length   ? `Days not yet covered this session: ${uncovered.join(', ')}.` : 'All mission days covered this session.',
+  ].filter(Boolean).join('\n');
+
+  const priorContext = priorSignals.length > 0
+    ? `Prior session signals for this candidate:\n${priorSignals.map(s => `- ${s}`).join('\n')}`
+    : '';
+
+  const conversationTranscript = history.slice(-10)
+    .map(m => `${m.role === 'interviewer' ? 'You' : candidate.member.name}: ${m.text}`)
     .join('\n');
 
-  const prompt = `You are a senior technical interviewer at a top tech company conducting a ${difficulty}-level ${track} interview.
+  const prompt = `You are a senior AI engineer conducting a technical interview. You are direct, curious, and never robotic. You ask real questions — not textbook definitions, but "why did you choose X", "what breaks when Y scales", "walk me through a real failure".
 
-${candidateName ? `Candidate name: ${candidateName}` : ''}
-Topics to cover: ${topics.join(', ')}
-Question type to ask next: ${questionType}
+CANDIDATE: ${candidate.member.name}, ${candidate.member.jobRole}, ${candidate.member.yearsExperience} years experience.
 
-Conversation so far:
-${historyContext || '(start of interview)'}
+MISSION INTELLIGENCE (use this to decide what to probe):
+${missionSummary}
 
-Ask the next interview question. Be concise and professional. Do NOT evaluate the candidate's previous answer — just ask the question. If this is the start, briefly introduce yourself and ask the first question. Keep your response to 2-4 sentences maximum.`;
+${priorContext}
 
+CONVERSATION SO FAR:
+${conversationTranscript || '(start of interview)'}
+
+${latestAnswer ? `CANDIDATE'S LATEST ANSWER:\n"${latestAnswer}"` : ''}
+
+YOUR TASK:
+${isStart
+  ? `Open the interview. ${priorSignals.length > 0 ? 'Weave in a brief natural reference to prior context if relevant (e.g. "Last time we touched on X, let\'s build on that today.")' : ''} Start with their strongest completed topic. Be warm but professional. 2-3 sentences maximum.`
+  : `Decide: should you follow up on the latest answer (if it was shallow, surprising, or incomplete), or move to a new topic (prioritize failed/high-attempt/skipped areas, then uncovered days)?
+Ask ONE question. Be specific and situational — reference the candidate's actual background or their previous answer if relevant. 2-3 sentences maximum.`
+}
+
+Respond ONLY with valid JSON (no markdown, no fences):
+{
+  "reply": "<your next question or follow-up, plain text>",
+  "dayNumber": <the curriculum day number this question is about, or 0 if it's a meta/behavioral question>,
+  "signal": ${latestAnswer ? '"<one-sentence observation about the latest answer for memory logging, e.g. Candidate explained X well but missed Y>"' : 'null'}
+}`;
+
+  const result = await model.generateContent(prompt);
+  return extractJSON<NextTurnResult>(result.response.text());
+}
+
+// ---------------------------------------------------------------------------
+// 2. finalFeedback — generate structured end-of-interview feedback
+// ---------------------------------------------------------------------------
+
+export interface FinalFeedbackOptions {
+  candidate: CandidateData;
+  history: InterviewMessage[];
+}
+
+export async function finalFeedback(opts: FinalFeedbackOptions): Promise<FinalFeedbackResult> {
+  const { candidate, history } = opts;
+  const model = getModel();
+
+  const transcript = history
+    .map(m => `${m.role === 'interviewer' ? 'Interviewer' : candidate.member.name}: ${m.text}`)
+    .join('\n');
+
+  const skippedTitles = candidate.missions.filter(m => m.skipped).map(m => m.title);
+  const failedTitles  = candidate.missions.filter(m => m.passed === false).map(m => m.title);
+
+  const prompt = `You are writing a structured post-interview assessment for ${candidate.member.name} (${candidate.member.jobRole}, ${candidate.member.yearsExperience} yrs experience).
+
+INTERVIEW TRANSCRIPT:
+${transcript}
+
+KNOWN GAPS FROM COURSE (skipped: ${skippedTitles.join(', ') || 'none'}; failed: ${failedTitles.join(', ') || 'none'}).
+
+Write a rigorous, specific assessment. Reference actual things the candidate said. Do not be vague.
+
+Respond ONLY with valid JSON (no markdown, no fences):
+{
+  "summary": "<2-3 sentence overall assessment — be direct about readiness>",
+  "strengths": ["<specific strength with evidence from transcript>", "..."],
+  "gaps": ["<specific gap or weak area, referencing skipped/failed topics or shallow answers>", "..."],
+  "next": ["<concrete actionable learning recommendation>", "..."]
+}
+
+Rules:
+- strengths: 3-5 items, each referencing something specific they said or demonstrated
+- gaps: 2-4 items, each tied to a concrete weak answer or known skipped/failed topic
+- next: 3-4 items, concrete (e.g. "Build a RAG pipeline from scratch using ChromaDB" not "Learn more about RAG")`;
+
+  const result = await model.generateContent(prompt);
+  return extractJSON<FinalFeedbackResult>(result.response.text());
+}
+
+// ---------------------------------------------------------------------------
+// Legacy exports (kept for backwards compatibility with any existing callers)
+// ---------------------------------------------------------------------------
+
+/** @deprecated Use nextTurn() instead */
+export async function generateInterviewQuestion(options: {
+  track: string;
+  difficulty: string;
+  questionType: string;
+  topics: string[];
+  history: { role: 'user' | 'interviewer'; content: string }[];
+  candidateName?: string;
+}): Promise<string> {
+  const model = getModel();
+  const { track, difficulty, questionType, topics, history, candidateName } = options;
+  const ctx = history.slice(-6).map(m => `${m.role === 'interviewer' ? 'Interviewer' : 'Candidate'}: ${m.content}`).join('\n');
+  const prompt = `You are a senior technical interviewer conducting a ${difficulty}-level ${track} interview.
+${candidateName ? `Candidate: ${candidateName}` : ''}
+Topics: ${topics.join(', ')}. Question type: ${questionType}.
+Conversation:\n${ctx || '(start)'}
+Ask the next question concisely (2-4 sentences). Do not evaluate the previous answer.`;
   const result = await model.generateContent(prompt);
   return result.response.text();
 }
 
-/**
- * Evaluates a candidate's answer and returns structured feedback
- */
+/** @deprecated Use finalFeedback() instead */
+export async function generateInterviewSummary(
+  history: { role: 'user' | 'interviewer'; content: string }[],
+  track: string,
+  difficulty: string,
+  candidateName?: string,
+): Promise<string> {
+  const model = getModel();
+  const transcript = history.map(m => `${m.role === 'interviewer' ? 'Interviewer' : 'Candidate'}: ${m.content}`).join('\n');
+  const result = await model.generateContent(
+    `Summarize this ${difficulty}-level ${track} interview${candidateName ? ` for ${candidateName}` : ''}.\n\nTranscript:\n${transcript}\n\nWrite 3-5 paragraphs: performance, strengths, weaknesses, recommendation.`
+  );
+  return result.response.text();
+}
+
+/** @deprecated Use nextTurn() instead */
 export async function evaluateAnswer(
   question: string,
   answer: string,
   track: string,
-  difficulty: 'junior' | 'mid' | 'senior'
-): Promise<EvaluationResult> {
-  const model = getModel();
-
-  const prompt = `You are evaluating a ${difficulty}-level ${track} interview answer.
-
-Question asked: "${question}"
-Candidate's answer: "${answer}"
-
-Evaluate this answer and respond ONLY with valid JSON in this exact format:
-{
-  "score": <number 0-10>,
-  "feedback": "<1-2 sentence overall assessment>",
-  "strengths": ["<strength 1>", "<strength 2>"],
-  "improvements": ["<area 1>", "<area 2>"],
-  "followUp": "<optional follow-up question to probe deeper, or null>"
-}`;
-
-  const result = await model.generateContent(prompt);
-  const text = result.response.text();
-
-  // Extract JSON from the response
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    throw new Error('Gemini did not return valid JSON evaluation');
-  }
-
-  return JSON.parse(jsonMatch[0]) as EvaluationResult;
-}
-
-/**
- * Generates a final interview summary
- */
-export async function generateInterviewSummary(
-  history: InterviewMessage[],
-  track: string,
   difficulty: string,
-  candidateName?: string
-): Promise<string> {
+): Promise<{ score: number; feedback: string; strengths: string[]; improvements: string[]; followUp?: string }> {
   const model = getModel();
-
-  const transcript = history
-    .map((m) => `${m.role === 'interviewer' ? 'Interviewer' : 'Candidate'}: ${m.content}`)
-    .join('\n');
-
-  const prompt = `You are summarizing a ${difficulty}-level ${track} technical interview${candidateName ? ` for ${candidateName}` : ''}.
-
-Full transcript:
-${transcript}
-
-Write a concise professional interview summary (3-5 paragraphs) covering:
-1. Overall performance assessment
-2. Technical strengths demonstrated
-3. Areas needing improvement
-4. Hiring recommendation (Strong Yes / Yes / Maybe / No)
-
-Be specific and reference actual answers from the transcript.`;
-
+  const prompt = `Evaluate this ${difficulty}-level ${track} answer.\nQ: "${question}"\nA: "${answer}"\nRespond ONLY with JSON: {"score":<0-10>,"feedback":"<string>","strengths":["..."],"improvements":["..."],"followUp":"<string or null>"}`;
   const result = await model.generateContent(prompt);
-  return result.response.text();
+  return extractJSON(result.response.text());
 }

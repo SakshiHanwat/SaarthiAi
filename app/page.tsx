@@ -3,58 +3,64 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
-import rawCurriculum from '@/data/curriculum.json';
+import rawCandidates from '@/data/candidates.json';
 
-// Derive track cards from the new AI-cohort curriculum schema (modules[])
-const TRACKS = rawCurriculum.modules.map((m) => ({
-  id: String(m.n),
-  title: m.title,
-  dayRange: `Days ${m.days[0]}–${m.days[1]}`,
-}));
-
-const QUESTION_TYPES = ['conceptual', 'coding', 'system_design', 'behavioral'] as const;
-
-const DIFFICULTY_LABELS = {
-  junior: { label: 'Junior', years: '0–2 yrs', color: '#22c55e' },
-  mid: { label: 'Mid-level', years: '2–5 yrs', color: '#f59e0b' },
-  senior: { label: 'Senior', years: '5+ yrs', color: '#ef4444' },
-};
-
-const QTYPE_LABELS: Record<string, string> = {
-  conceptual: 'Conceptual',
-  coding: 'Coding',
-  system_design: 'System Design',
-  behavioral: 'Behavioral',
-};
+const candidatesList = rawCandidates.candidates;
 
 export default function LandingPage() {
   const router = useRouter();
-  const [name, setName] = useState('');
-  const [track, setTrack] = useState('');
-  const [difficulty, setDifficulty] = useState<'junior' | 'mid' | 'senior'>('mid');
-  const [qtype, setQtype] = useState('conceptual');
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string>(candidatesList[0]?.member?.id || '');
+  const [customName, setCustomName] = useState('');
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState('');
 
   const handleStart = () => {
-    if (!track) {
-      setError('Please select a track to continue.');
-      return;
-    }
     setError('');
     setStarting(true);
+
+    let candidateObj: any = candidatesList.find((c) => c.member.id === selectedCandidateId);
+
+    if (!candidateObj) {
+      const id = `CAND-${uuidv4().slice(0, 6)}`;
+      candidateObj = {
+        member: {
+          id,
+          name: customName.trim() || 'Anonymous Candidate',
+          jobRole: 'Software Engineer',
+          yearsExperience: 3,
+          education: 'BS Computer Science',
+          status: 'ACTIVE',
+        },
+        missions: [],
+      };
+    } else if (customName.trim()) {
+      candidateObj = {
+        ...candidateObj,
+        member: {
+          ...candidateObj.member,
+          name: customName.trim(),
+        },
+      };
+    }
+
+    // Store candidate object in sessionStorage so the interview page can read it directly
+    try {
+      sessionStorage.setItem('saarthi_candidate', JSON.stringify(candidateObj));
+    } catch (e) {
+      console.warn('Failed to save to sessionStorage', e);
+    }
 
     const sessionId = uuidv4();
     const params = new URLSearchParams({
       sessionId,
-      track,
-      difficulty,
-      questionType: qtype,
-      ...(name.trim() ? { candidateName: name.trim() } : {}),
+      candidateId: candidateObj.member.id,
+      candidateName: candidateObj.member.name,
     });
 
     router.push(`/interview?${params.toString()}`);
   };
+
+  const selectedCandidate = candidatesList.find((c) => c.member.id === selectedCandidateId);
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
@@ -84,14 +90,14 @@ export default function LandingPage() {
             Saarthi
           </span>
         </div>
-        <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>AI Interview Platform</span>
+        <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>AI Technical Interview Platform</span>
       </nav>
 
       {/* Hero */}
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 24px 80px' }}>
         <div style={{ maxWidth: 640, width: '100%' }}>
           {/* Heading */}
-          <div style={{ marginBottom: 48 }}>
+          <div style={{ marginBottom: 40 }}>
             <div style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -104,15 +110,14 @@ export default function LandingPage() {
             }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block' }} />
               <span style={{ color: 'var(--accent)', fontSize: 12, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                AI-Powered Mock Interviews
+                AI Technical Interviewer
               </span>
             </div>
             <h1 style={{ margin: 0, fontSize: 'clamp(32px, 5vw, 48px)', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.15, color: 'var(--text)' }}>
-              Practice like it's{' '}
-              <span style={{ color: 'var(--accent)' }}>the real thing.</span>
+              Adaptive technical interviews powered by <span style={{ color: 'var(--accent)' }}>Gemini & Breeth.</span>
             </h1>
-            <p style={{ marginTop: 16, color: 'var(--text-muted)', fontSize: 16, lineHeight: 1.7, maxWidth: 520 }}>
-              Saarthi conducts structured technical interviews powered by Gemini. Get real-time feedback on every answer, track your progress, and improve faster.
+            <p style={{ marginTop: 16, color: 'var(--text-muted)', fontSize: 16, lineHeight: 1.7, maxWidth: 540 }}>
+              Saarthi probes completed, skipped, and high-attempt curriculum topics, tracking memory signals across sessions and producing detailed post-interview evaluations.
             </p>
           </div>
 
@@ -124,28 +129,87 @@ export default function LandingPage() {
             overflow: 'hidden',
           }}>
             {/* Card header */}
-            <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ display: 'flex', gap: 6 }}>
-                {['#ff5f57', '#febc2e', '#28c840'].map((c) => (
-                  <span key={c} style={{ width: 10, height: 10, borderRadius: '50%', background: c, display: 'inline-block' }} />
-                ))}
+            <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {['#ff5f57', '#febc2e', '#28c840'].map((c) => (
+                    <span key={c} style={{ width: 10, height: 10, borderRadius: '50%', background: c, display: 'inline-block' }} />
+                  ))}
+                </div>
+                <span style={{ color: 'var(--text-muted)', fontSize: 12, marginLeft: 8 }}>candidate_session.json</span>
               </div>
-              <span style={{ color: 'var(--text-muted)', fontSize: 12, marginLeft: 8 }}>interview_setup.json</span>
+              <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>20 Candidates Available</span>
             </div>
 
             {/* Card body */}
             <div style={{ padding: '28px 24px', display: 'flex', flexDirection: 'column', gap: 24 }}>
-              {/* Name */}
+              {/* Candidate dropdown */}
               <div>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>
-                  Your Name <span style={{ color: 'var(--text-dim)' }}>(optional)</span>
+                  Select Candidate Profile <span style={{ color: 'var(--danger)', fontSize: 11 }}>*</span>
+                </label>
+                <select
+                  id="candidate-select"
+                  value={selectedCandidateId}
+                  onChange={(e) => setSelectedCandidateId(e.target.value)}
+                  style={{
+                    width: '100%',
+                    background: 'var(--bg-3)',
+                    border: '1px solid var(--border-light)',
+                    borderRadius: 6,
+                    padding: '10px 14px',
+                    color: 'var(--text)',
+                    fontSize: 14,
+                    outline: 'none',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {candidatesList.map((c) => (
+                    <option key={c.member.id} value={c.member.id}>
+                      {c.member.name} — {c.member.jobRole} ({c.member.yearsExperience} yrs exp)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Selected Candidate Info Card */}
+              {selectedCandidate && (
+                <div style={{
+                  background: 'var(--bg-3)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 6,
+                  padding: '14px 16px',
+                  fontSize: 13,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 600, color: 'var(--text)' }}>{selectedCandidate.member.name}</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{selectedCandidate.member.id}</span>
+                  </div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                    Role: <strong style={{ color: 'var(--text)' }}>{selectedCandidate.member.jobRole}</strong> ({selectedCandidate.member.yearsExperience} yrs) · {selectedCandidate.member.education}
+                  </div>
+                  <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
+                    <span>Missions Passed: {selectedCandidate.missions.filter((m: any) => m.passed).length}</span>
+                    <span>Skipped: {selectedCandidate.missions.filter((m: any) => m.skipped).length}</span>
+                    <span>Failed: {selectedCandidate.missions.filter((m: any) => m.passed === false).length}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Custom Name Override */}
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>
+                  Override Name <span style={{ color: 'var(--text-dim)' }}>(optional)</span>
                 </label>
                 <input
-                  id="candidate-name"
+                  id="custom-name"
                   type="text"
-                  placeholder="e.g. Sakshi"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Enter custom candidate name..."
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
                   style={{
                     width: '100%',
                     background: 'var(--bg-3)',
@@ -160,96 +224,6 @@ export default function LandingPage() {
                   onFocus={(e) => e.currentTarget.style.borderColor = 'var(--accent)'}
                   onBlur={(e) => e.currentTarget.style.borderColor = 'var(--border-light)'}
                 />
-              </div>
-
-              {/* Track */}
-              <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>
-                  Track <span style={{ color: 'var(--danger)', fontSize: 11 }}>*</span>
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  {TRACKS.map((t) => (
-                    <button
-                      key={t.id}
-                      id={`track-${t.id}`}
-                      onClick={() => setTrack(t.id)}
-                      style={{
-                        background: track === t.id ? 'var(--accent-dim)' : 'var(--bg-3)',
-                        border: `1px solid ${track === t.id ? 'var(--accent)' : 'var(--border-light)'}`,
-                        borderRadius: 6,
-                        padding: '12px 14px',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        transition: 'all 0.15s',
-                        color: 'var(--text)',
-                      }}
-                    >
-                      <div style={{ fontSize: 13, fontWeight: 500 }}>{t.title}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                        {t.dayRange}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Difficulty */}
-              <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>
-                  Difficulty
-                </label>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {Object.entries(DIFFICULTY_LABELS).map(([key, val]) => (
-                    <button
-                      key={key}
-                      id={`difficulty-${key}`}
-                      onClick={() => setDifficulty(key as 'junior' | 'mid' | 'senior')}
-                      style={{
-                        flex: 1,
-                        background: difficulty === key ? 'var(--bg-3)' : 'transparent',
-                        border: `1px solid ${difficulty === key ? val.color : 'var(--border-light)'}`,
-                        borderRadius: 6,
-                        padding: '10px 8px',
-                        cursor: 'pointer',
-                        textAlign: 'center',
-                        transition: 'all 0.15s',
-                        color: difficulty === key ? val.color : 'var(--text-muted)',
-                      }}
-                    >
-                      <div style={{ fontSize: 13, fontWeight: 500 }}>{val.label}</div>
-                      <div style={{ fontSize: 11, marginTop: 1, opacity: 0.7 }}>{val.years}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Question type */}
-              <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>
-                  Question Focus
-                </label>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {QUESTION_TYPES.map((qt) => (
-                    <button
-                      key={qt}
-                      id={`qtype-${qt}`}
-                      onClick={() => setQtype(qt)}
-                      style={{
-                        background: qtype === qt ? 'var(--accent-dim)' : 'var(--bg-3)',
-                        border: `1px solid ${qtype === qt ? 'rgba(29,155,240,0.4)' : 'var(--border-light)'}`,
-                        borderRadius: 4,
-                        padding: '6px 12px',
-                        cursor: 'pointer',
-                        fontSize: 12,
-                        fontWeight: 500,
-                        color: qtype === qt ? 'var(--accent)' : 'var(--text-muted)',
-                        transition: 'all 0.15s',
-                      }}
-                    >
-                      {QTYPE_LABELS[qt]}
-                    </button>
-                  ))}
-                </div>
               </div>
 
               {/* Error */}
@@ -285,7 +259,7 @@ export default function LandingPage() {
                 {starting ? (
                   <>
                     <span style={{ width: 14, height: 14, border: '2px solid var(--text-dim)', borderTopColor: 'var(--text-muted)', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
-                    Starting...
+                    Initializing Interview...
                   </>
                 ) : (
                   'Start Interview →'
@@ -296,7 +270,7 @@ export default function LandingPage() {
 
           {/* Footer note */}
           <p style={{ textAlign: 'center', marginTop: 24, color: 'var(--text-dim)', fontSize: 12 }}>
-            Powered by Gemini · Memory by Breeth · No account required
+            Powered by Gemini 1.5 Flash · Memory by Breeth Graph REST API
           </p>
         </div>
       </main>
