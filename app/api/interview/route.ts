@@ -1,7 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateInterviewQuestion, evaluateAnswer, generateInterviewSummary, InterviewMessage } from '@/lib/gemini';
-import { addEpisode, searchMemory } from '@/lib/breeth';
-import curriculum from '@/data/curriculum.json';
+import { addEpisode, getSessionHistory } from '@/lib/breeth';
+import rawCurriculum from '@/data/curriculum.json';
+
+// ---------------------------------------------------------------------------
+// Adapt the AI-cohort curriculum schema to the track model the app expects.
+// Each module becomes a "track"; its day titles become the interview topics.
+// ---------------------------------------------------------------------------
+type CurriculumModule = typeof rawCurriculum.modules[number];
+type CurriculumDay   = typeof rawCurriculum.days[number];
+
+function getTrackData(trackId: string): { id: string; title: string; topics: string[] } | undefined {
+  const module: CurriculumModule | undefined = rawCurriculum.modules.find(
+    (m) => String(m.n) === trackId
+  );
+  if (!module) return undefined;
+
+  const [startDay, endDay] = module.days as [number, number];
+  const topics: string[] = (rawCurriculum.days as CurriculumDay[])
+    .filter((d) => d.day >= startDay && d.day <= endDay)
+    .map((d) => d.title);
+
+  return { id: trackId, title: module.title, topics };
+}
 
 export interface InterviewRequestBody {
   action: 'start' | 'answer' | 'summary';
@@ -10,6 +31,7 @@ export interface InterviewRequestBody {
   track?: string;
   difficulty?: 'junior' | 'mid' | 'senior';
   questionType?: 'conceptual' | 'coding' | 'system_design' | 'behavioral';
+  /** Client-side history (used as fallback when Breeth is unavailable) */
   history?: InterviewMessage[];
   lastQuestion?: string;
   answer?: string;
@@ -18,25 +40,41 @@ export interface InterviewRequestBody {
 export async function POST(req: NextRequest) {
   try {
     const body: InterviewRequestBody = await req.json();
-    const { action, sessionId, candidateName, track, difficulty, history = [], lastQuestion, answer, questionType } = body;
+    const {
+      action,
+      sessionId,
+      candidateName,
+      track,
+      difficulty,
+      history: clientHistory = [],
+      lastQuestion,
+      answer,
+      questionType,
+    } = body;
 
     switch (action) {
+      // ------------------------------------------------------------------
+      // start — initialise a new session, generate the first question
+      // ------------------------------------------------------------------
       case 'start': {
         if (!track || !difficulty) {
-          return NextResponse.json({ error: 'track and difficulty are required' }, { status: 400 });
+          return NextResponse.json(
+            { error: 'track and difficulty are required' },
+            { status: 400 }
+          );
         }
 
-        const trackData = curriculum.tracks.find((t) => t.id === track);
+        const trackData = getTrackData(track);
         if (!trackData) {
           return NextResponse.json({ error: 'Unknown track' }, { status: 400 });
         }
 
-        // Store session start in Breeth memory
-        await addEpisode({
-          content: `Interview session started. Candidate: ${candidateName || 'Anonymous'}. Track: ${trackData.title}. Difficulty: ${difficulty}. Session: ${sessionId}`,
-          source_description: `saarthi-session-start`,
-          group_id: sessionId,
-        });
+        // Persist session start in Breeth memory
+        await addEpisode(
+          sessionId,
+          `Interview session started. Candidate: ${candidateName || 'Anonymous'}. Track: ${trackData.title}. Difficulty: ${difficulty}.`,
+          'saarthi-session-start'
+        );
 
         const question = await generateInterviewQuestion({
           track: trackData.title,
@@ -47,77 +85,115 @@ export async function POST(req: NextRequest) {
           candidateName,
         });
 
+        // Persist the first interviewer turn so getSessionHistory can replay it
+        await addEpisode(
+          sessionId,
+          `Interviewer: ${question}`,
+          'saarthi-question'
+        );
+
         return NextResponse.json({ question });
       }
 
+      // ------------------------------------------------------------------
+      // answer — evaluate candidate's answer, persist it, generate next Q
+      // ------------------------------------------------------------------
       case 'answer': {
         if (!lastQuestion || !answer || !track || !difficulty) {
-          return NextResponse.json({ error: 'lastQuestion, answer, track, and difficulty are required' }, { status: 400 });
+          return NextResponse.json(
+            { error: 'lastQuestion, answer, track, and difficulty are required' },
+            { status: 400 }
+          );
         }
 
-        const trackData = curriculum.tracks.find((t) => t.id === track);
+        const trackData = getTrackData(track);
         if (!trackData) {
           return NextResponse.json({ error: 'Unknown track' }, { status: 400 });
         }
 
-        // Evaluate the answer
+        // Evaluate the candidate's answer
         const evaluation = await evaluateAnswer(lastQuestion, answer, trackData.title, difficulty);
 
-        // Store Q&A pair in Breeth memory
-        await addEpisode({
-          content: `Q: ${lastQuestion}\nA: ${answer}\nScore: ${evaluation.score}/10\nFeedback: ${evaluation.feedback}`,
-          source_description: `saarthi-qa`,
-          group_id: sessionId,
-        });
+        // Persist the candidate turn with role prefix so getSessionHistory can parse it
+        await addEpisode(
+          sessionId,
+          `Candidate: ${answer}`,
+          'saarthi-answer'
+        );
 
-        // Search for relevant context from past sessions (optional enrichment)
-        let contextHint: string | null = null;
-        try {
-          const memoryResults = await searchMemory(answer, sessionId, 3);
-          if (memoryResults.episodes?.length > 0) {
-            contextHint = memoryResults.episodes[0].content;
-          }
-        } catch {
-          // non-fatal — memory search is optional
+        // Persist the evaluation as a structured fact
+        await addEpisode(
+          sessionId,
+          `Evaluation — Score: ${evaluation.score}/10. ${evaluation.feedback}`,
+          'saarthi-eval'
+        );
+
+        // Reconstruct full conversation history from Breeth memory.
+        // Falls back to the client-supplied history if Breeth is unavailable.
+        let conversationHistory: InterviewMessage[] = await getSessionHistory(sessionId);
+        if (conversationHistory.length === 0) {
+          conversationHistory = [
+            ...clientHistory,
+            { role: 'interviewer', content: lastQuestion },
+            { role: 'user', content: answer },
+          ];
         }
 
-        // Generate next question
-        const updatedHistory: InterviewMessage[] = [
-          ...history,
-          { role: 'interviewer', content: lastQuestion },
-          { role: 'user', content: answer },
-        ];
-
+        // Generate the next question
         const nextQuestion = await generateInterviewQuestion({
           track: trackData.title,
           difficulty,
           questionType: questionType ?? 'conceptual',
           topics: trackData.topics,
-          history: updatedHistory,
+          history: conversationHistory,
           candidateName,
         });
 
-        return NextResponse.json({ evaluation, nextQuestion, contextHint });
+        // Persist the next interviewer question
+        await addEpisode(
+          sessionId,
+          `Interviewer: ${nextQuestion}`,
+          'saarthi-question'
+        );
+
+        return NextResponse.json({ evaluation, nextQuestion });
       }
 
+      // ------------------------------------------------------------------
+      // summary — generate final summary and persist it
+      // ------------------------------------------------------------------
       case 'summary': {
         if (!track || !difficulty) {
-          return NextResponse.json({ error: 'track and difficulty are required' }, { status: 400 });
+          return NextResponse.json(
+            { error: 'track and difficulty are required' },
+            { status: 400 }
+          );
         }
 
-        const trackData = curriculum.tracks.find((t) => t.id === track);
+        const trackData = getTrackData(track);
         if (!trackData) {
           return NextResponse.json({ error: 'Unknown track' }, { status: 400 });
         }
 
-        const summary = await generateInterviewSummary(history, trackData.title, difficulty, candidateName);
+        // Reconstruct history from Breeth; fall back to client history
+        let conversationHistory: InterviewMessage[] = await getSessionHistory(sessionId);
+        if (conversationHistory.length === 0) {
+          conversationHistory = clientHistory;
+        }
 
-        // Store final summary in Breeth
-        await addEpisode({
-          content: `Interview complete. Session: ${sessionId}. Candidate: ${candidateName || 'Anonymous'}.\n\n${summary}`,
-          source_description: `saarthi-summary`,
-          group_id: sessionId,
-        });
+        const summary = await generateInterviewSummary(
+          conversationHistory,
+          trackData.title,
+          difficulty,
+          candidateName
+        );
+
+        // Persist the final summary
+        await addEpisode(
+          sessionId,
+          `Interview complete. Candidate: ${candidateName || 'Anonymous'}.\n\n${summary}`,
+          'saarthi-summary'
+        );
 
         return NextResponse.json({ summary });
       }

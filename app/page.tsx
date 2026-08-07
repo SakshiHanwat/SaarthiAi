@@ -3,7 +3,16 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
-import curriculum from '@/data/curriculum.json';
+import rawCurriculum from '@/data/curriculum.json';
+
+// Derive track cards from the new AI-cohort curriculum schema (modules[])
+const TRACKS = rawCurriculum.modules.map((m) => ({
+  id: String(m.n),
+  title: m.title,
+  dayRange: `Days ${m.days[0]}–${m.days[1]}`,
+}));
+
+const QUESTION_TYPES = ['conceptual', 'coding', 'system_design', 'behavioral'] as const;
 
 const DIFFICULTY_LABELS = {
   junior: { label: 'Junior', years: '0–2 yrs', color: '#22c55e' },
@@ -159,7 +168,7 @@ export default function LandingPage() {
                   Track <span style={{ color: 'var(--danger)', fontSize: 11 }}>*</span>
                 </label>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  {curriculum.tracks.map((t) => (
+                  {TRACKS.map((t) => (
                     <button
                       key={t.id}
                       id={`track-${t.id}`}
@@ -177,7 +186,7 @@ export default function LandingPage() {
                     >
                       <div style={{ fontSize: 13, fontWeight: 500 }}>{t.title}</div>
                       <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                        {t.topics.slice(0, 2).join(', ')}...
+                        {t.dayRange}
                       </div>
                     </button>
                   ))}
@@ -220,7 +229,7 @@ export default function LandingPage() {
                   Question Focus
                 </label>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {curriculum.question_types.map((qt) => (
+                  {QUESTION_TYPES.map((qt) => (
                     <button
                       key={qt}
                       id={`qtype-${qt}`}
