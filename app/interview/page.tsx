@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import type { InterviewMessage, CandidateData, FinalFeedbackResult } from '@/lib/gemini';
+import rawCurriculum from '@/data/curriculum.json';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -13,6 +14,7 @@ interface ChatMessage {
   role: 'interviewer' | 'candidate' | 'system';
   text: string;
   timestamp: Date;
+  signalTag?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -42,14 +44,89 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
+function CurriculumCoverageMap({ daysCovered, compact = false }: { daysCovered: number[]; compact?: boolean }) {
+  const modules = rawCurriculum.modules;
+  const totalTouched = modules.filter(m =>
+    daysCovered.some(d => d >= m.days[0] && d <= m.days[1])
+  ).length;
+
+  return (
+    <div style={{
+      background: 'var(--bg-2)',
+      border: '1px solid var(--border)',
+      borderRadius: 8,
+      padding: compact ? '12px 14px' : '16px 18px',
+      fontSize: 13,
+    }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 10,
+      }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          Curriculum Coverage
+        </span>
+        <span style={{ fontSize: 11, color: totalTouched > 0 ? 'var(--accent)' : 'var(--text-dim)', fontWeight: 600 }}>
+          {totalTouched}/8 Modules Touched
+        </span>
+      </div>
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: compact ? 'repeat(4, 1fr)' : 'repeat(2, 1fr)',
+        gap: 6,
+      }}>
+        {modules.map(m => {
+          const isCovered = daysCovered.some(d => d >= m.days[0] && d <= m.days[1]);
+          return (
+            <div
+              key={m.n}
+              title={`Module ${m.n}: ${m.title} (Days ${m.days[0]}–${m.days[1]})`}
+              style={{
+                background: isCovered ? 'var(--accent-dim)' : 'var(--bg-3)',
+                border: `1px solid ${isCovered ? 'var(--accent)' : 'var(--border-light)'}`,
+                borderRadius: 6,
+                padding: compact ? '6px 8px' : '8px 10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <span style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: isCovered ? 'var(--accent)' : 'var(--text-dim)',
+                boxShadow: isCovered ? '0 0 6px var(--accent)' : 'none',
+                flexShrink: 0,
+              }} />
+              <div style={{ overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: isCovered ? 'var(--accent)' : 'var(--text-muted)' }}>
+                  M{m.n}
+                </span>
+                {!compact && (
+                  <span style={{ fontSize: 11, color: isCovered ? 'var(--text)' : 'var(--text-dim)', marginLeft: 4 }}>
+                    {m.title}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function Header({
-  candidateName, questionCount, daysCovered, elapsedMin, onFinish, loading,
+  candidateName, questionCount, daysCovered, elapsedMin, loading,
 }: {
   candidateName: string;
   questionCount: number;
   daysCovered: number[];
   elapsedMin: number;
-  onFinish?: () => void;
   loading: boolean;
 }) {
   return (
@@ -79,47 +156,32 @@ function Header({
         )}
       </div>
 
-      {/* Right: stats + end */}
+      {/* Right: stats */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
         <Stat label="Q" value={String(questionCount)} />
         <Stat label="days" value={String(daysCovered.length)} />
         <Stat label="min" value={String(elapsedMin)} />
-        {onFinish && (
-          <button
-            id="end-interview"
-            onClick={onFinish}
-            disabled={loading || questionCount < 2}
-            title={questionCount < 2 ? 'Answer at least 2 questions first' : 'End interview early'}
-            style={{
-              padding: '6px 14px',
-              background: 'transparent',
-              border: '1px solid var(--border-light)',
-              borderRadius: 4,
-              color: questionCount < 2 ? 'var(--text-dim)' : 'var(--text-muted)',
-              fontSize: 12,
-              fontWeight: 500,
-              cursor: questionCount < 2 ? 'not-allowed' : 'pointer',
-              transition: 'all 0.15s',
-            }}
-          >
-            End Interview
-          </button>
-        )}
       </div>
     </nav>
   );
 }
 
-function FeedbackPanel({ feedback, candidateName, onRestart }: {
+function FeedbackPanel({ feedback, candidateName, daysCovered, onRestart }: {
   feedback: FinalFeedbackResult;
   candidateName: string;
+  daysCovered: number[];
   onRestart: () => void;
 }) {
   return (
     <div style={{ maxWidth: 760, width: '100%', margin: '0 auto', padding: '40px 24px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 28 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
         <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 8px #22c55e' }} />
         <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>Interview Complete{candidateName ? ` · ${candidateName}` : ''}</h2>
+      </div>
+
+      {/* Final Coverage Map Snapshot */}
+      <div style={{ marginBottom: 24 }}>
+        <CurriculumCoverageMap daysCovered={daysCovered} compact={false} />
       </div>
 
       {/* Summary */}
@@ -200,11 +262,7 @@ function InterviewContent() {
   const params = useSearchParams();
   const router = useRouter();
 
-  // The interview/page is still accessible via the old query-param flow
-  // AND via new direct usage with a candidate object in sessionStorage.
-  // For now we read candidateId from params; the candidate object is
-  // fetched from sessionStorage (set by landing page) or built minimally.
-  const candidateParam = params.get('candidate'); // JSON-encoded candidate or null
+  const candidateParam = params.get('candidate');
   const candidateNameParam = params.get('candidateName') || '';
 
   const [candidate, setCandidate] = useState<CandidateData | null>(null);
@@ -215,6 +273,7 @@ function InterviewContent() {
   const [feedback, setFeedback] = useState<FinalFeedbackResult | null>(null);
   const [questionCount, setQuestionCount] = useState(0);
   const [daysCovered, setDaysCovered] = useState<number[]>([]);
+  const [priorSignals, setPriorSignals] = useState<string[]>([]);
   const [apiHistory, setApiHistory] = useState<InterviewMessage[]>([]);
   const [error, setError] = useState('');
 
@@ -227,12 +286,10 @@ function InterviewContent() {
   useEffect(() => {
     let cand: CandidateData | null = null;
 
-    // Try JSON param (future flow where landing page passes it)
     if (candidateParam) {
       try { cand = JSON.parse(decodeURIComponent(candidateParam)); } catch { /* ignore */ }
     }
 
-    // Try sessionStorage
     if (!cand) {
       try {
         const stored = sessionStorage.getItem('saarthi_candidate');
@@ -240,7 +297,6 @@ function InterviewContent() {
       } catch { /* ignore */ }
     }
 
-    // Fallback: build a minimal candidate from legacy query params
     if (!cand) {
       const id = params.get('sessionId') || `anon-${Date.now()}`;
       const name = candidateNameParam || 'Candidate';
@@ -295,6 +351,9 @@ function InterviewContent() {
       addMessage({ role: 'interviewer', text: data.reply });
       setQuestionCount(data.questionCount ?? 1);
       setDaysCovered(data.daysCovered ?? []);
+      if (data.priorSignals && Array.isArray(data.priorSignals)) {
+        setPriorSignals(data.priorSignals);
+      }
       setPhase('interview');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to start interview');
@@ -327,12 +386,24 @@ function InterviewContent() {
         daysCovered,
       });
 
+      // Attach subtle signalTag to candidate's message if returned
+      if (data.signalTag) {
+        setMessages(prev => {
+          const updated = [...prev];
+          const lastCandIdx = updated.map((m, i) => ({ m, i })).filter(({ m }) => m.role === 'candidate').pop()?.i;
+          if (lastCandIdx !== undefined) {
+            updated[lastCandIdx] = { ...updated[lastCandIdx], signalTag: data.signalTag };
+          }
+          return updated;
+        });
+      }
+
       if (data.done) {
         addMessage({ role: 'interviewer', text: data.reply });
         setFeedback(data.feedback);
+        if (data.daysCovered) setDaysCovered(data.daysCovered);
         setPhase('done');
       } else {
-        // Update history with interviewer's next question
         const withInterviewer: InterviewMessage[] = [
           ...newHistory,
           { role: 'interviewer', text: data.reply },
@@ -370,7 +441,7 @@ function InterviewContent() {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
         <Header candidateName={candidateName} questionCount={questionCount} daysCovered={daysCovered} elapsedMin={elapsedMin} loading={false} />
-        <FeedbackPanel feedback={feedback} candidateName={candidateName} onRestart={() => router.push('/')} />
+        <FeedbackPanel feedback={feedback} candidateName={candidateName} daysCovered={daysCovered} onRestart={() => router.push('/')} />
       </div>
     );
   }
@@ -385,66 +456,157 @@ function InterviewContent() {
         questionCount={questionCount}
         daysCovered={daysCovered}
         elapsedMin={elapsedMin}
-        onFinish={undefined /* auto-ends by API */}
         loading={loading}
       />
 
-      {/* Chat area */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: 0 }}>
-        <div style={{ maxWidth: 760, width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-          {phase === 'loading' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--text-muted)', padding: '20px 0' }}>
-              <Spinner />
-              <span>Connecting to interviewer...</span>
-            </div>
-          )}
-
-          {messages.map((msg) => (
-            <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: msg.role === 'candidate' ? 'flex-end' : 'flex-start' }}>
-              <span style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase', paddingLeft: msg.role !== 'candidate' ? 2 : 0 }}>
-                {msg.role === 'interviewer' ? 'Interviewer' : candidateName || 'You'}
-              </span>
-              <div style={{
-                maxWidth: '80%',
-                background: msg.role === 'candidate' ? 'var(--bg-3)' : 'var(--bg-2)',
-                border: `1px solid ${msg.role === 'interviewer' ? 'var(--border)' : 'var(--border-light)'}`,
-                borderRadius: msg.role === 'candidate' ? '8px 8px 2px 8px' : '8px 8px 8px 2px',
-                padding: '14px 16px',
-                color: 'var(--text)',
-                fontSize: 14,
-                lineHeight: 1.7,
-                whiteSpace: 'pre-wrap',
-              }}>
-                {msg.text}
+      {/* Main Container: Chat Column + Sidebar Coverage Map */}
+      <div style={{
+        flex: 1,
+        maxWidth: 1100,
+        width: '100%',
+        margin: '0 auto',
+        padding: '24px',
+        display: 'flex',
+        gap: 24,
+        overflow: 'hidden',
+      }}>
+        {/* Left: Chat Column */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          {/* Scrollable messages */}
+          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 20, paddingRight: 4 }}>
+            
+            {phase === 'loading' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--text-muted)', padding: '20px 0' }}>
+                <Spinner />
+                <span>Connecting to interviewer...</span>
               </div>
-              <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>
-                {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </span>
-            </div>
-          ))}
+            )}
 
-          {loading && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)', padding: '4px 0' }}>
-              <Spinner />
-              <span style={{ fontSize: 13 }}>Thinking...</span>
-            </div>
-          )}
+            {/* PRIOR SIGNALS RESUME INDICATOR */}
+            {priorSignals.length > 0 && (
+              <div style={{
+                background: 'var(--bg-2)',
+                border: '1px solid var(--border)',
+                borderRadius: 6,
+                padding: '10px 14px',
+                fontSize: 12,
+                color: 'var(--text-muted)',
+                lineHeight: 1.5,
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 10,
+              }}>
+                <span style={{ fontSize: 14 }}>📋</span>
+                <div>
+                  <div style={{ fontWeight: 600, color: 'var(--accent)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>
+                    Building on your last session
+                  </div>
+                  <div style={{ color: 'var(--text-dim)', fontSize: 12 }}>
+                    {priorSignals.slice(0, 2).map((s, idx) => (
+                      <div key={idx} style={{ marginTop: 2 }}>• {s}</div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
 
-          {error && (
+            {messages.map((msg) => (
+              <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: msg.role === 'candidate' ? 'flex-end' : 'flex-start' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                    {msg.role === 'interviewer' ? 'Interviewer' : candidateName || 'You'}
+                  </span>
+                </div>
+
+                <div style={{
+                  maxWidth: '84%',
+                  background: msg.role === 'candidate' ? 'var(--bg-3)' : 'var(--bg-2)',
+                  border: `1px solid ${msg.role === 'interviewer' ? 'var(--border)' : 'var(--border-light)'}`,
+                  borderRadius: msg.role === 'candidate' ? '8px 8px 2px 8px' : '8px 8px 8px 2px',
+                  padding: '14px 16px',
+                  color: 'var(--text)',
+                  fontSize: 14,
+                  lineHeight: 1.7,
+                  whiteSpace: 'pre-wrap',
+                }}>
+                  {msg.text}
+                </div>
+
+                {/* LIVE INTERVIEWER SIGNAL BADGE (understated private note) */}
+                {msg.role === 'candidate' && msg.signalTag && (
+                  <div style={{
+                    marginTop: 2,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    fontSize: 11,
+                    color: 'var(--text-muted)',
+                    background: 'var(--bg-3)',
+                    border: '1px solid var(--border-light)',
+                    borderRadius: 12,
+                    padding: '2px 8px',
+                  }}>
+                    <span style={{ fontSize: 10, opacity: 0.6 }}>📋 Read:</span>
+                    <span style={{ fontWeight: 500, color: 'var(--text)' }}>{msg.signalTag}</span>
+                  </div>
+                )}
+
+                <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+                  {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+            ))}
+
+            {loading && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)', padding: '4px 0' }}>
+                <Spinner />
+                <span style={{ fontSize: 13 }}>Evaluating answer...</span>
+              </div>
+            )}
+
+            {error && (
+              <div style={{
+                background: 'rgba(239,68,68,0.08)',
+                border: '1px solid rgba(239,68,68,0.25)',
+                borderRadius: 6,
+                padding: '10px 14px',
+                color: '#ef4444',
+                fontSize: 13,
+              }}>
+                {error}
+              </div>
+            )}
+
+            <div ref={bottomRef} />
+          </div>
+        </div>
+
+        {/* Right: Sidebar Curriculum Coverage Map */}
+        <div style={{ width: 280, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <CurriculumCoverageMap daysCovered={daysCovered} compact={false} />
+
+          {/* Candidate Context Pill */}
+          {candidate && (
             <div style={{
-              background: 'rgba(239,68,68,0.08)',
-              border: '1px solid rgba(239,68,68,0.25)',
-              borderRadius: 6,
-              padding: '10px 14px',
-              color: '#ef4444',
-              fontSize: 13,
+              background: 'var(--bg-2)',
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              padding: '12px 14px',
+              fontSize: 12,
+              color: 'var(--text-muted)',
             }}>
-              {error}
+              <div style={{ fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>
+                {candidate.member.name}
+              </div>
+              <div>{candidate.member.jobRole} · {candidate.member.yearsExperience} yrs exp</div>
+              {candidate.missions.length > 0 && (
+                <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border-light)', display: 'flex', gap: 8, fontSize: 11, color: 'var(--text-dim)' }}>
+                  <span>Passed: {candidate.missions.filter(m => m.passed).length}</span>
+                  <span>Skipped: {candidate.missions.filter(m => m.skipped).length}</span>
+                </div>
+              )}
             </div>
           )}
-
-          <div ref={bottomRef} />
         </div>
       </div>
 
@@ -456,7 +618,7 @@ function InterviewContent() {
           backdropFilter: 'blur(12px)',
           padding: '16px 24px',
         }}>
-          <div style={{ maxWidth: 760, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
             <textarea
               ref={textareaRef}
               id="answer-input"
@@ -505,7 +667,7 @@ function InterviewContent() {
                   gap: 6,
                 }}
               >
-                {loading ? <><Spinner size={12} /> Thinking</> : 'Submit Answer →'}
+                {loading ? <><Spinner size={12} /> Evaluating</> : 'Submit Answer →'}
               </button>
             </div>
           </div>

@@ -103,6 +103,7 @@ export async function POST(req: NextRequest) {
         done: false,
         questionCount: 1,
         daysCovered,
+        priorSignals,
       });
     }
 
@@ -158,6 +159,8 @@ export async function POST(req: NextRequest) {
           reply: 'Interview completed.',
           done: true,
           feedback,
+          signalTag: turn.signalTag ?? null,
+          daysCovered,
         });
       }
 
@@ -169,6 +172,7 @@ export async function POST(req: NextRequest) {
         done: false,
         questionCount,
         daysCovered,
+        signalTag: turn.signalTag ?? null,
       });
     }
 

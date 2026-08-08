@@ -84,6 +84,8 @@ export interface NextTurnResult {
   dayNumber: number;
   /** One-sentence signal for Breeth writeInterviewSignal (null if answer not yet available) */
   signal: string | null;
+  /** Short 2-4 word concise read on the answer (e.g. "Strong fundamentals", "Needs depth") */
+  signalTag: string | null;
 }
 
 /** What finalFeedback returns */
@@ -165,7 +167,8 @@ Respond ONLY with valid JSON (no markdown, no fences):
 {
   "reply": "<your next question or follow-up, plain text>",
   "dayNumber": <the curriculum day number this question is about, or 0 if it's a meta/behavioral question>,
-  "signal": ${latestAnswer ? '"<one-sentence observation about the latest answer for memory logging, e.g. Candidate explained X well but missed Y>"' : 'null'}
+  "signal": ${latestAnswer ? '"<one-sentence observation about the latest answer for memory logging, e.g. Candidate explained X well but missed Y>"' : 'null'},
+  "signalTag": ${latestAnswer ? '"<2-4 word concise read on the answer, e.g. Strong fundamentals, Needs depth, Spot-on trade-off, Confident explanation, Shallow response>"' : 'null'}
 }`;
 
   const result = await model.generateContent(prompt);
