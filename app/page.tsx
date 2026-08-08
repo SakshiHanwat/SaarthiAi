@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { v4 as uuidv4 } from 'uuid';
 import { motion } from 'framer-motion';
 import { Plus, LayoutGrid, ArrowRight, Search } from 'lucide-react';
@@ -14,13 +15,27 @@ const TOTAL_DAYS = rawCurriculum.days.length;
 
 const ROLES = ['All Roles', ...Array.from(new Set(CANDIDATES.map((c) => c.member.jobRole)))];
 
-function SaarthiLogoMark() {
+function SaarthiLogoMark({ size = 30 }: { size?: number }) {
   return (
-    <div style={{ width: 26, height: 26, background: '#000', borderRadius: 6, border: '1px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(-35deg)' }}>
-        <rect x="3" y="6" width="18" height="5" rx="2.5" fill="#ffffff" />
-        <rect x="3" y="13" width="18" height="5" rx="2.5" fill="#ffffff" opacity="0.6" />
-      </svg>
+    <div style={{
+      width: size,
+      height: size,
+      borderRadius: 7,
+      overflow: 'hidden',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+      background: '#ffffff',
+      padding: 2,
+    }}>
+      <Image
+        src="/logo.png"
+        alt="Saarthi Logo"
+        width={size}
+        height={size}
+        style={{ objectFit: 'contain', width: '100%', height: '100%' }}
+      />
     </div>
   );
 }
@@ -133,10 +148,10 @@ export default function LandingPage() {
           }}
           className="md:px-8"
         >
-          {/* Left: Logo & Wordmark */}
+          {/* Left: Image Logo & Wordmark */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <SaarthiLogoMark />
-            <span style={{ fontSize: 14, fontWeight: 600, color: '#ffffff', letterSpacing: '-0.02em' }} className="hidden md:inline-block">
+            <SaarthiLogoMark size={30} />
+            <span style={{ fontSize: 15, fontWeight: 700, color: '#ffffff', letterSpacing: '-0.02em' }} className="hidden md:inline-block">
               Saarthi
             </span>
           </div>
@@ -234,8 +249,34 @@ export default function LandingPage() {
               flexWrap: 'wrap',
             }}
           >
-            {/* LEFT BLOCK: SUBTITLE, HEADING, BUTTONS */}
+            {/* LEFT BLOCK: LOGO BADGE, SUBTITLE, HEADING, BUTTONS */}
             <div style={{ flex: 1, minWidth: 280, maxWidth: 720 }}>
+              
+              {/* Centered/Subtle Larger Hero Logo Element */}
+              <motion.div
+                initial={{ y: 16, opacity: 0, scale: 0.95 }}
+                animate={{ y: 0, opacity: 1, scale: 1 }}
+                transition={{ delay: 0.55, duration: 0.8 }}
+                style={{
+                  marginBottom: 20,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 8,
+                  borderRadius: 14,
+                  background: '#ffffff',
+                  boxShadow: '0 0 36px rgba(29, 155, 240, 0.3)',
+                }}
+              >
+                <Image
+                  src="/logo.png"
+                  alt="Saarthi Hero Brand"
+                  width={68}
+                  height={68}
+                  style={{ objectFit: 'contain', borderRadius: 8 }}
+                />
+              </motion.div>
+
               {/* Subtitle */}
               <motion.div
                 initial={{ y: 16, opacity: 0 }}
@@ -432,7 +473,7 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* RESPONSIVE CANDIDATE CARDS GRID (1 col mobile, 2 tablet, 3 desktop) */}
+          {/* RESPONSIVE CANDIDATE CARDS GRID */}
           {filteredCandidates.length === 0 ? (
             <div
               style={{

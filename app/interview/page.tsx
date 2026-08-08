@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import Image from 'next/image';
 import type { InterviewMessage, CandidateData, FinalFeedbackResult } from '@/lib/gemini';
 import rawCurriculum from '@/data/curriculum.json';
 
@@ -150,16 +151,42 @@ function Header({
       zIndex: 20,
       flexShrink: 0,
     }}>
-      {/* Left: brand */}
+      {/* Left: brand & candidate subtitle */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)', boxShadow: '0 0 8px var(--accent)' }} />
+        <div
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 7,
+            overflow: 'hidden',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            background: '#ffffff',
+            padding: 2,
+          }}
+        >
+          <Image
+            src="/logo.png"
+            alt="Saarthi Logo"
+            width={28}
+            height={28}
+            style={{ objectFit: 'contain', width: '100%', height: '100%' }}
+          />
+        </div>
         <span style={{ fontWeight: 700, fontSize: 15, color: '#ffffff', letterSpacing: '-0.01em' }}>Saarthi</span>
         {candidateName && (
           <>
             <span style={{ width: 1, height: 16, background: 'rgba(255, 255, 255, 0.15)' }} />
-            <span style={{ fontSize: 12, color: 'rgba(255, 255, 255, 0.6)', fontWeight: 500 }} className="truncate max-w-[140px] sm:max-w-none">
-              {candidateName}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 12, color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600 }} className="truncate max-w-[120px] sm:max-w-none">
+                {candidateName}
+              </span>
+              <span style={{ fontSize: 11, color: 'rgba(255, 255, 255, 0.45)', fontWeight: 400 }} className="hidden sm:inline-block">
+                · Interview with Saarthi
+              </span>
+            </div>
           </>
         )}
       </div>
