@@ -20,21 +20,24 @@ function SaarthiLogoMark({ size = 30 }: { size?: number }) {
     <div style={{
       width: size,
       height: size,
-      borderRadius: 7,
-      overflow: 'hidden',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       flexShrink: 0,
-      background: '#ffffff',
-      padding: 2,
+      background: 'transparent',
     }}>
       <Image
         src="/logo.png"
         alt="Saarthi Logo"
         width={size}
         height={size}
-        style={{ objectFit: 'contain', width: '100%', height: '100%' }}
+        style={{
+          objectFit: 'contain',
+          width: '100%',
+          height: '100%',
+          mixBlendMode: 'screen',
+          filter: 'invert(1) hue-rotate(180deg) drop-shadow(0 0 8px rgba(29, 155, 240, 0.4))',
+        }}
       />
     </div>
   );
@@ -252,7 +255,7 @@ export default function LandingPage() {
             {/* LEFT BLOCK: LOGO BADGE, SUBTITLE, HEADING, BUTTONS */}
             <div style={{ flex: 1, minWidth: 280, maxWidth: 720 }}>
               
-              {/* Centered/Subtle Larger Hero Logo Element */}
+              {/* Fully Transparent Hero Logo Container + Soft Blue Accent Glow */}
               <motion.div
                 initial={{ y: 16, opacity: 0, scale: 0.95 }}
                 animate={{ y: 0, opacity: 1, scale: 1 }}
@@ -262,18 +265,19 @@ export default function LandingPage() {
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  padding: 8,
-                  borderRadius: 14,
-                  background: '#ffffff',
-                  boxShadow: '0 0 36px rgba(29, 155, 240, 0.3)',
+                  background: 'transparent',
                 }}
               >
                 <Image
                   src="/logo.png"
                   alt="Saarthi Hero Brand"
-                  width={68}
-                  height={68}
-                  style={{ objectFit: 'contain', borderRadius: 8 }}
+                  width={72}
+                  height={72}
+                  style={{
+                    objectFit: 'contain',
+                    mixBlendMode: 'screen',
+                    filter: 'invert(1) hue-rotate(180deg) drop-shadow(0 0 24px rgba(29, 155, 240, 0.5))',
+                  }}
                 />
               </motion.div>
 

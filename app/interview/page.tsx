@@ -157,14 +157,11 @@ function Header({
           style={{
             width: 28,
             height: 28,
-            borderRadius: 7,
-            overflow: 'hidden',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
-            background: '#ffffff',
-            padding: 2,
+            background: 'transparent',
           }}
         >
           <Image
@@ -172,7 +169,13 @@ function Header({
             alt="Saarthi Logo"
             width={28}
             height={28}
-            style={{ objectFit: 'contain', width: '100%', height: '100%' }}
+            style={{
+              objectFit: 'contain',
+              width: '100%',
+              height: '100%',
+              mixBlendMode: 'screen',
+              filter: 'invert(1) hue-rotate(180deg) drop-shadow(0 0 6px rgba(29, 155, 240, 0.4))',
+            }}
           />
         </div>
         <span style={{ fontWeight: 700, fontSize: 15, color: '#ffffff', letterSpacing: '-0.01em' }}>Saarthi</span>
