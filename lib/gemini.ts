@@ -27,7 +27,7 @@ const safetySettings = [
 ];
 
 function getModel() {
-  return genAI.getGenerativeModel({ model: 'gemini-2.5-flash', safetySettings });
+  return genAI.getGenerativeModel({ model: 'gemini-flash-latest', safetySettings });
 }
 
 /** Extract the first JSON object from a model response (strips markdown fences). */
