@@ -4,7 +4,7 @@ import { useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
 import { motion } from 'framer-motion';
-import { Plus, LayoutGrid, ArrowRight, Search, Brain, Layers, CheckCircle2, ChevronDown } from 'lucide-react';
+import { Plus, LayoutGrid, ArrowRight, Search, CheckCircle2 } from 'lucide-react';
 import rawCandidates from '@/data/candidates.json';
 import rawCurriculum from '@/data/curriculum.json';
 
@@ -16,7 +16,7 @@ const ROLES = ['All Roles', ...Array.from(new Set(CANDIDATES.map((c) => c.member
 
 function SaarthiLogoMark() {
   return (
-    <div style={{ width: 26, height: 26, background: '#000', borderRadius: 6, border: '1px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ width: 26, height: 26, background: '#000', borderRadius: 6, border: '1px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(-35deg)' }}>
         <rect x="3" y="6" width="18" height="5" rx="2.5" fill="#ffffff" />
         <rect x="3" y="13" width="18" height="5" rx="2.5" fill="#ffffff" opacity="0.6" />
@@ -70,7 +70,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div style={{ background: '#0a0a0a', color: '#ffffff', minHeight: '100vh', fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div style={{ background: '#0a0a0a', color: '#ffffff', minHeight: '100vh', fontFamily: 'Inter, system-ui, sans-serif', overflowX: 'hidden' }}>
       
       {/* =================================================================== */}
       {/* 1. FULL-SCREEN HERO LANDING SECTION                                 */}
@@ -84,7 +84,6 @@ export default function LandingPage() {
           transition={{ duration: 1.8, ease: 'easeOut' }}
           style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0 }}
         >
-          {/* Subtle grid pattern */}
           <div
             style={{
               position: 'absolute',
@@ -96,14 +95,14 @@ export default function LandingPage() {
               backgroundSize: '48px 48px',
             }}
           />
-          {/* Subtle blue accent glow */}
           <div
             style={{
               position: 'absolute',
               top: '-15%',
               left: '50%',
               transform: 'translateX(-50%)',
-              width: '800px',
+              width: '100%',
+              maxWidth: '800px',
               height: '500px',
               background: 'radial-gradient(ellipse at center, rgba(29, 155, 240, 0.09) 0%, transparent 65%)',
               filter: 'blur(70px)',
@@ -126,11 +125,13 @@ export default function LandingPage() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '0 28px',
+            padding: '0 20px',
             background: 'rgba(10, 10, 10, 0.8)',
             backdropFilter: 'blur(16px)',
             borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+            boxSizing: 'border-box',
           }}
+          className="md:px-8"
         >
           {/* Left: Logo & Wordmark */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -148,7 +149,7 @@ export default function LandingPage() {
                 background: '#1a1a1a',
                 border: '1px solid rgba(255,255,255,0.1)',
                 borderRadius: 9999,
-                padding: '4px 10px',
+                padding: '5px 12px',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 6,
@@ -170,7 +171,7 @@ export default function LandingPage() {
                 background: '#1a1a1a',
                 border: '1px solid rgba(255,255,255,0.1)',
                 borderRadius: 9999,
-                padding: '4px 12px',
+                padding: '5px 14px',
                 alignItems: 'center',
                 gap: 8,
                 fontSize: 11,
@@ -190,7 +191,7 @@ export default function LandingPage() {
               background: '#1a1a1a',
               border: '1px solid rgba(255,255,255,0.1)',
               borderRadius: 9999,
-              padding: '4px 12px',
+              padding: '5px 14px',
               alignItems: 'center',
               gap: 8,
               fontSize: 11,
@@ -215,11 +216,13 @@ export default function LandingPage() {
           style={{
             zIndex: 10,
             background: 'linear-gradient(to top, #0a0a0a 0%, rgba(10,10,10,0.88) 55%, transparent 100%)',
-            padding: '80px 32px 48px',
+            padding: '60px 20px 40px',
             width: '100%',
             maxWidth: '1280px',
             margin: '0 auto',
+            boxSizing: 'border-box',
           }}
+          className="md:px-8 md:py-16"
         >
           <div
             style={{
@@ -232,7 +235,7 @@ export default function LandingPage() {
             }}
           >
             {/* LEFT BLOCK: SUBTITLE, HEADING, BUTTONS */}
-            <div style={{ flex: 1, minWidth: 300, maxWidth: 720 }}>
+            <div style={{ flex: 1, minWidth: 280, maxWidth: 720 }}>
               {/* Subtitle */}
               <motion.div
                 initial={{ y: 16, opacity: 0 }}
@@ -253,11 +256,11 @@ export default function LandingPage() {
                 transition={{ delay: 0.8, duration: 0.8 }}
                 style={{
                   fontWeight: 300,
-                  fontSize: 'clamp(2rem, 7.5vw, 4.5rem)',
+                  fontSize: 'clamp(2.2rem, 6.5vw, 4.5rem)',
                   letterSpacing: '-0.03em',
                   lineHeight: 1,
                   color: '#ffffff',
-                  margin: '0 0 28px',
+                  margin: '0 0 24px',
                 }}
               >
                 Interviews That<br />
@@ -277,7 +280,7 @@ export default function LandingPage() {
                     background: '#ffffff',
                     color: '#000000',
                     borderRadius: 9999,
-                    padding: '10px 22px',
+                    padding: '11px 24px',
                     fontSize: 13,
                     fontWeight: 600,
                     cursor: 'pointer',
@@ -301,7 +304,7 @@ export default function LandingPage() {
                     color: '#ffffff',
                     border: '1px solid rgba(255, 255, 255, 0.2)',
                     borderRadius: 9999,
-                    padding: '10px 20px',
+                    padding: '11px 22px',
                     fontSize: 13,
                     fontWeight: 500,
                     cursor: 'pointer',
@@ -320,7 +323,7 @@ export default function LandingPage() {
               initial={{ y: 16, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 1.1, duration: 0.8 }}
-              style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}
+              style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}
             >
               <span style={{ background: '#141414', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', fontSize: 11, borderRadius: 9999, padding: '6px 14px' }}>
                 Gemini-powered
@@ -339,13 +342,13 @@ export default function LandingPage() {
       {/* =================================================================== */}
       {/* 2. CANDIDATE EVALUATION ROSTER & DASHBOARD SECTION                  */}
       {/* =================================================================== */}
-      <div id="roster" ref={rosterRef} style={{ position: 'relative', zIndex: 10, maxWidth: 1280, margin: '0 auto', padding: '60px 28px 100px', scrollMarginTop: '64px' }}>
+      <div id="roster" ref={rosterRef} style={{ position: 'relative', zIndex: 10, maxWidth: 1280, margin: '0 auto', padding: '48px 20px 80px', scrollMarginTop: '64px', boxSizing: 'border-box' }} className="md:px-8">
         
         {/* METRICS / STATS OVERVIEW STRIP */}
         <section
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
             gap: 16,
             marginBottom: 48,
           }}
@@ -369,23 +372,23 @@ export default function LandingPage() {
                 </p>
               </div>
 
-              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', background: '#141414', border: '1px solid rgba(255,255,255,0.1)', padding: '4px 12px', borderRadius: 6 }}>
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', background: '#121212', border: '1px solid rgba(255,255,255,0.1)', padding: '4px 12px', borderRadius: 6 }}>
                 Showing {filteredCandidates.length} of {CANDIDATES.length} Candidates
               </span>
             </div>
 
             {/* SEARCH & FILTER BAR */}
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-              <div style={{ position: 'relative', flex: 1, minWidth: 260 }}>
+              <div style={{ position: 'relative', flex: 1, minWidth: 240 }}>
                 <input
                   id="candidate-search"
                   type="text"
-                  placeholder="Search candidate by name, role, ID, education..."
+                  placeholder="Search candidate by name, role, ID..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   style={{
                     width: '100%',
-                    background: '#141414',
+                    background: '#121212',
                     border: '1px solid rgba(255, 255, 255, 0.12)',
                     borderRadius: 8,
                     padding: '10px 14px 10px 36px',
@@ -404,13 +407,13 @@ export default function LandingPage() {
               </div>
 
               {/* Role filter pills */}
-              <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
+              <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2, maxWidth: '100%' }}>
                 {ROLES.map((role) => (
                   <button
                     key={role}
                     onClick={() => setSelectedRole(role)}
                     style={{
-                      background: selectedRole === role ? 'rgba(29, 155, 240, 0.15)' : '#141414',
+                      background: selectedRole === role ? 'rgba(29, 155, 240, 0.15)' : '#121212',
                       border: `1px solid ${selectedRole === role ? '#1d9bf0' : 'rgba(255, 255, 255, 0.1)'}`,
                       borderRadius: 6,
                       padding: '8px 12px',
@@ -429,11 +432,11 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* CANDIDATE CARDS GRID */}
+          {/* RESPONSIVE CANDIDATE CARDS GRID (1 col mobile, 2 tablet, 3 desktop) */}
           {filteredCandidates.length === 0 ? (
             <div
               style={{
-                background: '#141414',
+                background: '#121212',
                 border: '1px solid rgba(255,255,255,0.1)',
                 borderRadius: 8,
                 padding: '48px 24px',
@@ -448,13 +451,7 @@ export default function LandingPage() {
               </div>
             </div>
           ) : (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
-                gap: 16,
-              }}
-            >
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
               {filteredCandidates.map((c) => (
                 <CandidateCard
                   key={c.member.id}
@@ -472,7 +469,7 @@ export default function LandingPage() {
       <footer
         style={{
           borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-          padding: '24px 32px',
+          padding: '24px 28px',
           background: '#0a0a0a',
           display: 'flex',
           alignItems: 'center',
@@ -508,8 +505,8 @@ function MetricCard({ title, value, subtitle, icon }: { title: string; value: st
   return (
     <div
       style={{
-        background: '#141414',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
+        background: '#121212',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
         borderRadius: 8,
         padding: '18px 20px',
         display: 'flex',
@@ -556,8 +553,8 @@ function CandidateCard({
     <div
       onClick={onStart}
       style={{
-        background: '#141414',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
+        background: '#121212',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
         borderRadius: 10,
         padding: '20px',
         display: 'flex',
@@ -567,14 +564,15 @@ function CandidateCard({
         transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
         position: 'relative',
         overflow: 'hidden',
+        boxSizing: 'border-box',
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = 'rgba(29, 155, 240, 0.4)';
+        e.currentTarget.style.borderColor = 'rgba(29, 155, 240, 0.5)';
         e.currentTarget.style.transform = 'translateY(-2px)';
-        e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.4)';
+        e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.5)';
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
         e.currentTarget.style.transform = 'none';
         e.currentTarget.style.boxShadow = 'none';
       }}
@@ -584,7 +582,7 @@ function CandidateCard({
           <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: '#ffffff' }}>
             {member.name}
           </h3>
-          <span style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255, 255, 255, 0.5)', background: '#1f1f1f', border: '1px solid rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: 4 }}>
+          <span style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255, 255, 255, 0.5)', background: '#1f1f1f', border: '1px solid rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: 4, flexShrink: 0 }}>
             {member.id}
           </span>
         </div>
