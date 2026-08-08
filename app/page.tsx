@@ -4,7 +4,7 @@ import { useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
 import { motion } from 'framer-motion';
-import { Plus, LayoutGrid, ArrowRight, Search, CheckCircle2 } from 'lucide-react';
+import { Plus, LayoutGrid, ArrowRight, Search } from 'lucide-react';
 import rawCandidates from '@/data/candidates.json';
 import rawCurriculum from '@/data/curriculum.json';
 

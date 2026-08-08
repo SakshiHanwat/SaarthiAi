@@ -128,13 +128,12 @@ function CurriculumCoverageMap({ daysCovered, compact = false }: { daysCovered: 
 }
 
 function Header({
-  candidateName, questionCount, daysCovered, elapsedMin, loading,
+  candidateName, questionCount, daysCovered, elapsedMin,
 }: {
   candidateName: string;
   questionCount: number;
   daysCovered: number[];
   elapsedMin: number;
-  loading: boolean;
 }) {
   return (
     <nav style={{
@@ -454,7 +453,7 @@ function InterviewContent() {
   if (phase === 'done' && feedback) {
     return (
       <div style={{ minHeight: '100vh', background: '#0a0a0a', display: 'flex', flexDirection: 'column' }}>
-        <Header candidateName={candidateName} questionCount={questionCount} daysCovered={daysCovered} elapsedMin={elapsedMin} loading={false} />
+        <Header candidateName={candidateName} questionCount={questionCount} daysCovered={daysCovered} elapsedMin={elapsedMin} />
         <FeedbackPanel feedback={feedback} candidateName={candidateName} daysCovered={daysCovered} onRestart={() => router.push('/')} />
       </div>
     );
@@ -470,7 +469,6 @@ function InterviewContent() {
         questionCount={questionCount}
         daysCovered={daysCovered}
         elapsedMin={elapsedMin}
-        loading={loading}
       />
 
       {/* Main Container: Chat Column + Sidebar Coverage Map */}
